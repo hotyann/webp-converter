@@ -1,0 +1,238 @@
+<!-- Developed by hotyann -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEBP Converter</title>
+    <style type="text/css">
+      body {
+        font-size: 14px;
+      }
+      select {
+        width: 100px;
+        padding: 5px;
+      }
+      .opts, .opts > div, .btns, .results > div {
+        display: flex;
+        align-items: center;
+      }
+      .opts > div, .results > div, .tips > div {
+        margin: 10px;
+      }
+      .btns > span {
+        color: #fff;
+        background: #3b82f6;
+        border-radius: 4px;
+        cursor: pointer;
+        padding: 5px 10px;
+        margin: 10px;
+        transition: all .2s;
+        user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-user-select: none;
+        &:not(.disabled):hover {
+          background: #2563eb;
+        }
+        &.disabled {
+          opacity: .6;
+          cursor: default;
+        }
+      }
+      #upload {
+        display: none;
+      }
+      #process {
+        width: 200px;
+        height: 10px;
+        background: #ced4da;
+        border-radius: 2px;
+        position: relative;
+        margin: 2px;
+        & > span {
+          max-width: 200px;
+          height: 10px;
+          background: #1ea97c;
+          position: absolute;
+          left: 0;
+          top: 0;
+        }
+      }
+      #qualityValue, #processValue {
+        margin-left: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="tips">
+      <div>⚠️ 注意：</div>
+      <div>1. 选择 png 格式时无法指定图片质量。</div>
+      <div>2. 下载多个文件时需要浏览器授权（每下载50个文件需授权一次）。</div>
+      <div>3. 无法指定图片的保存位置，默认保存到C盘下载（Downloads）文件夹。</div>
+      <div>4. 推荐使用谷歌浏览器。</div>
+    </div>
+    <div class="opts">
+      <div>
+        <label for="type">转换成：</label>
+        <select name="type" id="type" onchange="onTypeChange(this)">
+          <option value="jpeg" selected>jpeg</option>
+          <option value="png">png</option>
+          <option value="webp">webp</option>
+        </select>
+      </div>
+      <div>
+        <label for="quality">品质：</label>
+        <input type="range" name="quality" id="quality" value="100" oninput="onRangeChanged(this)"/>
+        <output id="qualityValue">100</output>
+      </div>
+    </div>
+    <div class="btns">
+      <input type="file" id="upload" accept="image/*" multiple onchange="onFileChanged(this)" oninput="">
+      <span onclick="onUpload()">选择文件</span>
+      <span class="disabled" onclick="onConvert()">转 换</span>
+      <span class="disabled" onclick="onDownload()">下 载</span>
+      <span class="disabled" onclick="onClear()">清 空</span>
+    </div>
+    <div class="results">
+      <div>
+        <output id="fileValue">未选择任何文件</output>
+      </div>
+      <div>
+        完成进度：
+        <div id="process">
+          <span></span>
+        </div>
+        <output id="processValue"></output>
+      </div>
+    </div>
+  </body>
+  <script type="text/javascript">
+    let files = []
+    let images = []
+
+    const upload = document.getElementById('upload')
+    const btns = document.querySelectorAll('.btns span')
+
+    const type = document.getElementById('type')
+    const quality = document.getElementById('quality')
+    const qualityValue = document.getElementById('qualityValue')
+
+    const fileValue = document.getElementById('fileValue')
+    const process = document.querySelector('#process span')
+    const processValue = document.getElementById('processValue')
+
+    // 点击选择文件按钮
+    function onUpload() {
+      upload.click()
+    }
+    // 选择图片格式
+    function onTypeChange(target) {
+      // 如果是png，隐藏品质选项
+      quality.parentNode.style.display = target?.value === 'png' ? 'none' : 'flex'
+      clearImages()
+    }
+    // 选择图片质量
+    function onRangeChanged(target) {
+      qualityValue.textContent = target?.value
+      clearImages()
+    }
+    // 选择文件处理
+    function onFileChanged(target) {
+      if (target?.files?.length) {
+        btns[1] && btns[1].classList.remove('disabled')
+        btns[3] && btns[3].classList.remove('disabled')
+        files = target.files
+        fileValue.textContent = files.length === 1 ? `已选择 ${files[0].name}` : `已选择${files.length}个文件`
+        clearImages()
+      }
+    }
+    // 点击转换按钮
+    function onConvert() {
+      if (btns[1] && btns[1].classList.contains('disabled')) return
+      clearImages()
+      this.convertHandler(0)
+    }
+    // 转换处理
+    function convertHandler(index) {
+      const rate = index / files.length
+      process.style.width = `${rate * 100}%`
+      processValue.textContent = `${Math.floor(rate * 100)}%`
+      // 转换完成
+      if (index > files.length - 1) {
+        btns[2] && btns[2].classList.remove('disabled')
+        return
+      }
+      const file = files[index]
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = (e) => {
+        let img = new Image()
+        img.src = e.target.result
+        img.onload = function() {
+          let canvas = document.createElement('canvas')
+          let w = this.width
+          let h = this.height
+          canvas.setAttribute('width', w)
+          canvas.setAttribute('height', h)
+          canvas.getContext('2d').drawImage(this, 0, 0, w, h)
+          let base64 = canvas.toDataURL(`image/${type.value}`, quality.value / 100)
+          images.push({
+            href: base64,
+            name: `${file.name.replace(/(.*?\.)([^.]+)$/, '$1')}${type.value}`
+          })
+          convertHandler(index + 1)
+        }
+      }
+    }
+    // 点击下载按钮
+    function onDownload() {
+      if (btns[2] && btns[2].classList.contains('disabled')) return
+      this.downloadHandler(0)
+    }
+    // 下载处理
+    function downloadHandler(index) {
+      // 下载完成
+      if (index > images.length - 1) {
+        window.alert('下载完成')
+        return
+      }
+      const image = images[index]
+      let a = document.createElement('a')
+      a.href = image.href
+      a.download = image.name
+      a.click()
+      a.remove()
+      // 每隔0.5秒下载一张图
+      const timer = setTimeout(() => {
+        downloadHandler(index + 1)
+        clearTimeout(timer)
+      }, 500)
+    }
+    // 点击清空按钮
+    function onClear() {
+      if (btns[3] && btns[3].classList.contains('disabled')) return
+      clearHandler()
+    }
+    // 清空处理
+    function clearHandler() {
+      btns[1] && btns[1].classList.add('disabled')
+      btns[3] && btns[3].classList.add('disabled')
+      upload.value = ''
+      files = []
+      fileValue.textContent = '未选择任何文件'
+      clearImages()
+    }
+    // 清空图片转换列表
+    function clearImages() {
+      btns[2] && btns[2].classList.add('disabled')
+      images = []
+      process.style.width = 0
+      processValue.textContent = ''
+    }
+  </script>
+  <script type="text/javascript">
+    console.log(`　　　　 　　 ＿＿\n　　　 　　／＞　　フ\n　　　 　　| 　_　 _ l\n　 　　 　／\` ミ＿xノ\n　　 　 /　　　 　 |\n　　　 /　 ヽ　　 ﾉ\n　 　 │　　|　|　|\n　／￣|　　 |　|　|    hotyann\n　| (￣ヽ＿_ヽ_)__)　_(′ཀ｀」∠)_\n　＼二つ`);
+  </script>
+</html>
